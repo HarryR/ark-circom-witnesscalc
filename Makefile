@@ -1,8 +1,14 @@
-all: test
+all: lint test test-cli
+
+lint:
+	cargo fmt --all -- --check
+	cargo clippy --all-targets --all-features -- -D warnings
 
 test:
-	cargo build
 	cargo test
+
+test-cli:
+	cargo build	
 	mkdir -p tmp
 	./target/debug/ark_cwc_setup example/multiply.r1cs tmp/pkey tmp/vk tmp/vk.json
 	./target/debug/ark_cwc_prove example/multiply.input.json example/multiply.graph example/multiply.r1cs tmp/pkey tmp/proof.json tmp/proof.bin

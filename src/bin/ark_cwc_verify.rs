@@ -1,8 +1,8 @@
+use ark_bn254::Fr as Bn254Fr;
 use std::env;
 use std::fs::read;
 use std::process::ExitCode;
 use std::str::FromStr;
-use ark_bn254::Fr as Bn254Fr;
 
 use ark_circom_witnesscalc::verify_proof;
 use ark_ff::BigInt;
@@ -21,19 +21,16 @@ fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
         public_inputs.push(el);
     }
 
-    let proof_data = read(&args[1])
-        .expect("Failed to read proof bin file");
+    let proof_data = read(&args[1]).expect("Failed to read proof bin file");
 
-    let vk_data = read(&args[2])
-        .expect("Failed to read vk bin file");
+    let vk_data = read(&args[2]).expect("Failed to read vk bin file");
 
     let result = verify_proof(&vk_data, &proof_data, &public_inputs)?;
 
     if result {
         println!("true");
         Ok(ExitCode::SUCCESS)
-    }
-    else {
+    } else {
         eprintln!("false");
         Ok(ExitCode::FAILURE)
     }

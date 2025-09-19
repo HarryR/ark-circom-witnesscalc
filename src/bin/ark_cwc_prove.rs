@@ -1,9 +1,9 @@
 use std::env;
-use std::fs::{OpenOptions, read, read_to_string, write};
+use std::fs::{read, read_to_string, write, OpenOptions};
 
 use anyhow::Result;
+use ark_circom_witnesscalc::{jsonstructs::proof_to_json, proof_oneshot};
 use ark_serialize::CanonicalSerialize;
-use ark_circom_witnesscalc::{proof_oneshot, jsonstructs::proof_to_json};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -19,18 +19,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path_out_proof_json = &args[5];
     let path_out_proof_bin = &args[6];
 
-    let inputs_data = read_to_string(path_input_json)
-        .expect("Failed to read input file");
-    let graph_data = read(path_input_graph)
-        .expect("Failed to read graph file");
+    let inputs_data = read_to_string(path_input_json).expect("Failed to read input file");
+    let graph_data = read(path_input_graph).expect("Failed to read graph file");
 
-    let r1cs_data = read(path_input_r1cs)
-        .expect("Failed to read r1cs file");
+    let r1cs_data = read(path_input_r1cs).expect("Failed to read r1cs file");
 
-    let pkey_data = read(path_input_pkey)
-        .expect("Failed to read graph file");
+    let pkey_data = read(path_input_pkey).expect("Failed to read graph file");
 
-    let (proof,public_inputs) = proof_oneshot(&inputs_data, &pkey_data, &graph_data, &r1cs_data);    
+    let (proof, public_inputs) = proof_oneshot(&inputs_data, &pkey_data, &graph_data, &r1cs_data);
 
     let proof_json = proof_to_json(&proof, &public_inputs)?;
 

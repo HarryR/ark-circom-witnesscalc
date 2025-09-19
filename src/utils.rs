@@ -1,9 +1,9 @@
-use std::vec;
-use std::io::Cursor;
 use std::collections::HashMap;
+use std::io::Cursor;
+use std::vec;
 
-use anyhow::Result;
 use anyhow::anyhow;
+use anyhow::Result;
 use ark_groth16::prepare_verifying_key;
 use ark_groth16::VerifyingKey;
 
@@ -16,13 +16,13 @@ use circom_witnesscalc::{
     field::{Field, FieldOperations, FieldOps, U254},
     graph::{evaluate, Nodes, NodesInterface, NodesStorage, VecNodes},
     storage::proto_deserializer::deserialize_witnesscalc_graph_from_bytes,
-    InputSignalsInfo
+    InputSignalsInfo,
 };
 
 use ark_bn254::{Bn254, Fr as Bn254Fr};
 use ark_crypto_primitives::snark::SNARK;
 use ark_ff::PrimeField;
-use ark_groth16::{r1cs_to_qap::LibsnarkReduction, Groth16, ProvingKey, Proof};
+use ark_groth16::{r1cs_to_qap::LibsnarkReduction, Groth16, Proof, ProvingKey};
 use ark_serialize::CanonicalDeserialize;
 use ark_std::rand::thread_rng;
 
@@ -31,7 +31,7 @@ pub fn calc_len(vs: &Vec<serde_json::Value>) -> usize {
 
     for v in vs {
         if let serde_json::Value::Array(arr) = v {
-            len += calc_len(arr)-1;
+            len += calc_len(arr) - 1;
         }
     }
 
@@ -41,8 +41,8 @@ pub fn calc_len(vs: &Vec<serde_json::Value>) -> usize {
 pub fn flatten_array2<T: FieldOps>(
     key: &str,
     vs: &Vec<serde_json::Value>,
-    ff: &Field<T>) -> Result<Vec<T>, Box<dyn std::error::Error>> {
-
+    ff: &Field<T>,
+) -> Result<Vec<T>, Box<dyn std::error::Error>> {
     let mut vals: Vec<T> = Vec::with_capacity(calc_len(vs));
 
     for v in vs {
@@ -66,15 +66,14 @@ pub fn flatten_array2<T: FieldOps>(
                 return Err(anyhow!("inputs must be a string: {}", key).into());
             }
         };
-
     }
     Ok(vals)
 }
 
 pub fn deserialize_inputs2<T: FieldOps>(
     inputs_data: &[u8],
-    ff: &Field<T>) -> Result<HashMap<String, Vec<T>>, Box<dyn std::error::Error>> {
-
+    ff: &Field<T>,
+) -> Result<HashMap<String, Vec<T>>, Box<dyn std::error::Error>> {
     let v: serde_json::Value = serde_json::from_slice(inputs_data)?;
 
     let map = if let serde_json::Value::Object(map) = v {
@@ -113,22 +112,21 @@ pub fn deserialize_inputs2<T: FieldOps>(
 }
 
 pub fn calc_witness_typed<T: FieldOps, NS: NodesStorage>(
-    nodes: &Nodes<T, NS>, inputs: &str, input_mapping: &InputSignalsInfo,
-    signals: &[usize]) -> Result<Vec<T>, Box<dyn std::error::Error>> {
-
-    let inputs = deserialize_inputs2(
-        inputs.as_bytes(), &nodes.ff)?;
+    nodes: &Nodes<T, NS>,
+    inputs: &str,
+    input_mapping: &InputSignalsInfo,
+    signals: &[usize],
+) -> Result<Vec<T>, Box<dyn std::error::Error>> {
+    let inputs = deserialize_inputs2(inputs.as_bytes(), &nodes.ff)?;
     let inputs = create_inputs(&inputs, input_mapping)?;
-    let result = evaluate(
-        &nodes.ff, &nodes.nodes, &inputs, signals,
-        &nodes.constants);
+    let result = evaluate(&nodes.ff, &nodes.nodes, &inputs, signals, &nodes.constants);
     Ok(result)
 }
 
 pub fn create_inputs<T: FieldOps>(
     input_list: &HashMap<String, Vec<T>>,
-    inputs_info: &InputSignalsInfo) -> Result<Vec<T>, Box<dyn std::error::Error>> {
-
+    inputs_info: &InputSignalsInfo,
+) -> Result<Vec<T>, Box<dyn std::error::Error>> {
     let mut max_idx: usize = 0;
     for (offset, len) in inputs_info.values() {
         let idx = offset + len;
@@ -139,7 +137,7 @@ pub fn create_inputs<T: FieldOps>(
     let mut inputs = vec![T::zero(); max_idx + 1];
     inputs[0] = T::one();
     for (key, value) in input_list {
-        if ! inputs_info.contains_key(key) {
+        if !inputs_info.contains_key(key) {
             return Err(anyhow!("Unknown key in input: '{}'", key).into());
         }
         let (offset, len) = inputs_info[key];
@@ -150,14 +148,14 @@ pub fn create_inputs<T: FieldOps>(
         for (i, v) in value.iter().enumerate() {
             inputs[offset + i] = *v;
         }
-    };
+    }
     Ok(inputs)
 }
 
-pub fn calc_witness2<F:PrimeField>(
+pub fn calc_witness2<F: PrimeField>(
     inputs: &str,
-    graph_data: &[u8]) -> Result<Vec<F>, Box<dyn std::error::Error>> {
-
+    graph_data: &[u8],
+) -> Result<Vec<F>, Box<dyn std::error::Error>> {
     //let start = std::time::Instant::now();
     // let inputs = deserialize_inputs(inputs.as_bytes())?;
     //println!("Inputs loaded in {:?}", start.elapsed());
@@ -172,7 +170,10 @@ pub fn calc_witness2<F:PrimeField>(
     // populate_inputs(&inputs, &input_mapping, &mut inputs_buffer);
     //println!("Inputs populated in {:?}", start.elapsed());
 
-    let nodes = nodes.as_any().downcast_ref::<Nodes<U254, VecNodes>>().unwrap();
+    let nodes = nodes
+        .as_any()
+        .downcast_ref::<Nodes<U254, VecNodes>>()
+        .unwrap();
     let result = calc_witness_typed(nodes, inputs, &input_mapping, &signals)?;
     let vec_witness: Vec<F> = result
         .iter()
@@ -181,9 +182,13 @@ pub fn calc_witness2<F:PrimeField>(
     Ok(vec_witness)
 }
 
-pub fn proof_oneshot(inputs_data: &str, pkey_data:&[u8], graph_data:&[u8], r1cs_data:&[u8]) -> (Proof<Bn254>,Vec<Bn254Fr>)
-{
-    let witness = calc_witness2(&inputs_data, &graph_data).unwrap();
+pub fn proof_oneshot(
+    inputs_data: &str,
+    pkey_data: &[u8],
+    graph_data: &[u8],
+    r1cs_data: &[u8],
+) -> (Proof<Bn254>, Vec<Bn254Fr>) {
+    let witness = calc_witness2(inputs_data, graph_data).unwrap();
 
     let r1cs_reader = Cursor::new(r1cs_data);
     let r1cs = R1CSFile::new(r1cs_reader).unwrap();
@@ -198,19 +203,23 @@ pub fn proof_oneshot(inputs_data: &str, pkey_data:&[u8], graph_data:&[u8], r1cs_
 
     let public_inputs = circom.get_public_inputs().unwrap();
     let mut rng = thread_rng();
-    
-    let proof = Groth16::<Bn254,LibsnarkReduction>::prove(&pkey, circom, &mut rng).unwrap();
+
+    let proof = Groth16::<Bn254, LibsnarkReduction>::prove(&pkey, circom, &mut rng).unwrap();
 
     // Verify the proof can be rverified!
     let pvk = prepare_verifying_key(&pkey.vk);
-    let result = Groth16::<Bn254,LibsnarkReduction>::verify_proof(&pvk, &proof, &public_inputs).unwrap();
+    let result =
+        Groth16::<Bn254, LibsnarkReduction>::verify_proof(&pvk, &proof, &public_inputs).unwrap();
     assert!(result);
 
     (proof, public_inputs)
 }
 
-pub fn verify_proof(vkey_data:&[u8], proof_data: &[u8], public_inputs: &[Bn254Fr]) -> Result<bool>
-{
+pub fn verify_proof(
+    vkey_data: &[u8],
+    proof_data: &[u8],
+    public_inputs: &[Bn254Fr],
+) -> Result<bool> {
     let vkey_reader = Cursor::new(vkey_data);
     let vkey = VerifyingKey::<Bn254>::deserialize_uncompressed_unchecked(vkey_reader).unwrap();
 
@@ -218,17 +227,16 @@ pub fn verify_proof(vkey_data:&[u8], proof_data: &[u8], public_inputs: &[Bn254Fr
     let proof = Proof::<Bn254>::deserialize_uncompressed_unchecked(proof_reader).unwrap();
 
     let pvk = prepare_verifying_key(&vkey);
-    let result = Groth16::<Bn254,LibsnarkReduction>::verify_proof(&pvk, &proof, public_inputs)?;
+    let result = Groth16::<Bn254, LibsnarkReduction>::verify_proof(&pvk, &proof, public_inputs)?;
     Ok(result)
 }
 
-pub fn verify_proof_json(vkey_json:&str, proof_json: &str) -> Result<bool>
-{
-    let (proof, public_inputs) = proof_from_json(&proof_json)?;
+pub fn verify_proof_json(vkey_json: &str, proof_json: &str) -> Result<bool> {
+    let (proof, public_inputs) = proof_from_json(proof_json)?;
     let vkey = verifying_key_from_json(vkey_json)?;
 
     let pvk = prepare_verifying_key(&vkey);
-    let result = Groth16::<Bn254,LibsnarkReduction>::verify_proof(&pvk, &proof, &public_inputs)?;
+    let result = Groth16::<Bn254, LibsnarkReduction>::verify_proof(&pvk, &proof, &public_inputs)?;
 
     Ok(result)
 }

@@ -1,9 +1,9 @@
-use anyhow::{Result, anyhow};
-use serde::{Deserialize, Serialize};
-use ark_bn254::{Bn254, Fr, Fq, Fq2};
+use anyhow::{anyhow, Result};
+use ark_bn254::{Bn254, Fq, Fq2, Fr};
 use ark_ec::pairing::Pairing;
-use ark_groth16::{VerifyingKey, Proof};
 use ark_ff::BigInt;
+use ark_groth16::{Proof, VerifyingKey};
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 // JSON representation structs
@@ -46,12 +46,19 @@ fn g2_point_to_strings(point: &<Bn254 as Pairing>::G2Affine) -> [[String; 2]; 3]
     ]
 }
 
-fn parse_g1_point_from_strings(x_str: &str, y_str: &str, z_str: &str) -> Result<<Bn254 as Pairing>::G1Affine> {
+fn parse_g1_point_from_strings(
+    x_str: &str,
+    y_str: &str,
+    z_str: &str,
+) -> Result<<Bn254 as Pairing>::G1Affine> {
     // Verify it's in affine representation
     if z_str != "1" {
-        return Err(anyhow!("G1 point not in affine representation: z = {}, expected 1", z_str));
+        return Err(anyhow!(
+            "G1 point not in affine representation: z = {}, expected 1",
+            z_str
+        ));
     }
-    
+
     let x_bi = BigInt::<4>::from_str(x_str)
         .map_err(|_| anyhow!("Failed to parse x coordinate: {}", x_str))?;
     let y_bi = BigInt::<4>::from_str(y_str)
@@ -64,10 +71,13 @@ fn parse_g1_point_from_strings(x_str: &str, y_str: &str, z_str: &str) -> Result<
 fn parse_g2_point_from_coords(coords: &[[String; 2]; 3]) -> Result<<Bn254 as Pairing>::G2Affine> {
     // Verify it's in affine representation
     if coords[2][0] != "1" || coords[2][1] != "0" {
-        return Err(anyhow!("G2 point not in affine representation: z = [{}, {}], expected [1, 0]", 
-                          coords[2][0], coords[2][1]));
+        return Err(anyhow!(
+            "G2 point not in affine representation: z = [{}, {}], expected [1, 0]",
+            coords[2][0],
+            coords[2][1]
+        ));
     }
-    
+
     let x_c0_bi = BigInt::<4>::from_str(&coords[0][0])
         .map_err(|_| anyhow!("Failed to parse x.c0: {}", &coords[0][0]))?;
     let x_c1_bi = BigInt::<4>::from_str(&coords[0][1])
@@ -76,15 +86,15 @@ fn parse_g2_point_from_coords(coords: &[[String; 2]; 3]) -> Result<<Bn254 as Pai
         .map_err(|_| anyhow!("Failed to parse y.c0: {}", &coords[1][0]))?;
     let y_c1_bi = BigInt::<4>::from_str(&coords[1][1])
         .map_err(|_| anyhow!("Failed to parse y.c1: {}", &coords[1][1]))?;
-    
+
     let x = Fq2::new(Fq::new(x_c0_bi), Fq::new(x_c1_bi));
     let y = Fq2::new(Fq::new(y_c0_bi), Fq::new(y_c1_bi));
     Ok(<Bn254 as Pairing>::G2Affine::new(x, y))
 }
 
 fn parse_field_element(s: &str) -> Result<Fr> {
-    let bi = BigInt::<4>::from_str(s)
-        .map_err(|_| anyhow!("Failed to parse field element: {}", s))?;
+    let bi =
+        BigInt::<4>::from_str(s).map_err(|_| anyhow!("Failed to parse field element: {}", s))?;
     Ok(Fr::new(bi))
 }
 
@@ -109,14 +119,24 @@ impl TryFrom<VerifyingKeyJson> for VerifyingKey<Bn254> {
 
     fn try_from(json: VerifyingKeyJson) -> Result<Self> {
         if json.protocol != "groth16" {
-            return Err(anyhow!("Invalid protocol: expected 'groth16', got '{}'", json.protocol));
+            return Err(anyhow!(
+                "Invalid protocol: expected 'groth16', got '{}'",
+                json.protocol
+            ));
         }
         if json.curve != "bn128" {
-            return Err(anyhow!("Invalid curve: expected 'bn128', got '{}'", json.curve));
+            return Err(anyhow!(
+                "Invalid curve: expected 'bn128', got '{}'",
+                json.curve
+            ));
         }
 
         // Parse alpha_g1 using helper function
-        let alpha_g1 = parse_g1_point_from_strings(&json.vk_alpha_1[0], &json.vk_alpha_1[1], &json.vk_alpha_1[2])?;
+        let alpha_g1 = parse_g1_point_from_strings(
+            &json.vk_alpha_1[0],
+            &json.vk_alpha_1[1],
+            &json.vk_alpha_1[2],
+        )?;
 
         // Parse G2 points using helper function
         let beta_g2 = parse_g2_point_from_coords(&json.vk_beta_2)?;
@@ -150,7 +170,10 @@ impl From<(&Proof<Bn254>, &Vec<Fr>)> for ProofJson {
             a: g1_point_to_strings(&proof.a),
             b: g2_point_to_strings(&proof.b),
             c: g1_point_to_strings(&proof.c),
-            inputs: public_inputs.iter().map(|input| input.to_string()).collect(),
+            inputs: public_inputs
+                .iter()
+                .map(|input| input.to_string())
+                .collect(),
         }
     }
 }
@@ -160,13 +183,22 @@ impl TryFrom<ProofJson> for (Proof<Bn254>, Vec<Fr>) {
 
     fn try_from(json: ProofJson) -> Result<Self> {
         if json.protocol != "groth16" {
-            return Err(anyhow!("Invalid protocol: expected 'groth16', got '{}'", json.protocol));
+            return Err(anyhow!(
+                "Invalid protocol: expected 'groth16', got '{}'",
+                json.protocol
+            ));
         }
         if json.curve != "bn128" {
-            return Err(anyhow!("Invalid curve: expected 'bn128', got '{}'", json.curve));
+            return Err(anyhow!(
+                "Invalid curve: expected 'bn128', got '{}'",
+                json.curve
+            ));
         }
         if json.proof_type != "proof" {
-            return Err(anyhow!("Invalid type: expected 'proof', got '{}'", json.proof_type));
+            return Err(anyhow!(
+                "Invalid type: expected 'proof', got '{}'",
+                json.proof_type
+            ));
         }
 
         // Parse G1 points using helper function
@@ -205,7 +237,6 @@ pub fn proof_to_json(proof: &Proof<Bn254>, public_inputs: &Vec<Fr>) -> Result<St
     Ok(serde_json::to_string_pretty(&json_proof)?)
 }
 
-
 pub fn proof_from_json(json_str: &str) -> Result<(Proof<Bn254>, Vec<Fr>)> {
     let json_proof: ProofJson = serde_json::from_str(json_str)?;
     <(Proof<Bn254>, Vec<Fr>)>::try_from(json_proof)
@@ -214,7 +245,7 @@ pub fn proof_from_json(json_str: &str) -> Result<(Proof<Bn254>, Vec<Fr>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_verifying_key_deserialization() {
         let vk_json = r#"{
@@ -233,32 +264,64 @@ mod tests {
 }"#;
 
         let result = verifying_key_from_json(vk_json);
-        assert!(result.is_ok(), "Failed to deserialize verifying key: {:?}", result.err());
-        
+        assert!(
+            result.is_ok(),
+            "Failed to deserialize verifying key: {:?}",
+            result.err()
+        );
+
         let vk = result.unwrap();
-        
+
         // Verify basic properties
-        assert_eq!(vk.gamma_abc_g1.len(), 3, "Expected 3 IC elements (nPublic=2 + 1)");
-        
+        assert_eq!(
+            vk.gamma_abc_g1.len(),
+            3,
+            "Expected 3 IC elements (nPublic=2 + 1)"
+        );
+
         // Test roundtrip serialization
         let serialized = verifying_key_to_json(&vk);
-        assert!(serialized.is_ok(), "Failed to serialize verifying key: {:?}", serialized.err());
-        
+        assert!(
+            serialized.is_ok(),
+            "Failed to serialize verifying key: {:?}",
+            serialized.err()
+        );
+
         // Deserialize again and compare
         let vk2_result = verifying_key_from_json(&serialized.unwrap());
-        assert!(vk2_result.is_ok(), "Failed to deserialize roundtrip verifying key: {:?}", vk2_result.err());
-        
+        assert!(
+            vk2_result.is_ok(),
+            "Failed to deserialize roundtrip verifying key: {:?}",
+            vk2_result.err()
+        );
+
         let vk2 = vk2_result.unwrap();
-        
+
         // Compare key fields (basic structural equality)
-        assert_eq!(vk.gamma_abc_g1.len(), vk2.gamma_abc_g1.len(), "IC length mismatch after roundtrip");
-        assert_eq!(vk.alpha_g1, vk2.alpha_g1, "alpha_g1 mismatch after roundtrip");
+        assert_eq!(
+            vk.gamma_abc_g1.len(),
+            vk2.gamma_abc_g1.len(),
+            "IC length mismatch after roundtrip"
+        );
+        assert_eq!(
+            vk.alpha_g1, vk2.alpha_g1,
+            "alpha_g1 mismatch after roundtrip"
+        );
         assert_eq!(vk.beta_g2, vk2.beta_g2, "beta_g2 mismatch after roundtrip");
-        assert_eq!(vk.gamma_g2, vk2.gamma_g2, "gamma_g2 mismatch after roundtrip");
-        assert_eq!(vk.delta_g2, vk2.delta_g2, "delta_g2 mismatch after roundtrip");
-        assert_eq!(vk.gamma_abc_g1, vk2.gamma_abc_g1, "gamma_abc_g1 mismatch after roundtrip");
+        assert_eq!(
+            vk.gamma_g2, vk2.gamma_g2,
+            "gamma_g2 mismatch after roundtrip"
+        );
+        assert_eq!(
+            vk.delta_g2, vk2.delta_g2,
+            "delta_g2 mismatch after roundtrip"
+        );
+        assert_eq!(
+            vk.gamma_abc_g1, vk2.gamma_abc_g1,
+            "gamma_abc_g1 mismatch after roundtrip"
+        );
     }
-    
+
     #[test]
     fn test_proof_deserialization() {
         let proof_json = r#"{
@@ -275,33 +338,49 @@ mod tests {
 }"#;
 
         let result = proof_from_json(proof_json);
-        assert!(result.is_ok(), "Failed to deserialize proof: {:?}", result.err());
-        
+        assert!(
+            result.is_ok(),
+            "Failed to deserialize proof: {:?}",
+            result.err()
+        );
+
         let (proof, public_inputs) = result.unwrap();
-        
+
         // Verify basic properties
         assert_eq!(public_inputs.len(), 2, "Expected 2 public inputs");
-        
+
         // Verify input values
         assert_eq!(public_inputs[0].to_string(), "110", "First input mismatch");
         assert_eq!(public_inputs[1].to_string(), "11", "Second input mismatch");
-        
+
         // Test roundtrip serialization
         let serialized = proof_to_json(&proof, &public_inputs);
-        assert!(serialized.is_ok(), "Failed to serialize proof: {:?}", serialized.err());
-        
+        assert!(
+            serialized.is_ok(),
+            "Failed to serialize proof: {:?}",
+            serialized.err()
+        );
+
         // Deserialize again and compare
         let (proof2, public_inputs2) = proof_from_json(&serialized.unwrap()).unwrap();
-        
+
         // Compare proof fields
         assert_eq!(proof.a, proof2.a, "Point A mismatch after roundtrip");
         assert_eq!(proof.b, proof2.b, "Point B mismatch after roundtrip");
         assert_eq!(proof.c, proof2.c, "Point C mismatch after roundtrip");
-        
+
         // Compare public inputs
-        assert_eq!(public_inputs.len(), public_inputs2.len(), "Public inputs length mismatch after roundtrip");
+        assert_eq!(
+            public_inputs.len(),
+            public_inputs2.len(),
+            "Public inputs length mismatch after roundtrip"
+        );
         for (i, (input1, input2)) in public_inputs.iter().zip(public_inputs2.iter()).enumerate() {
-            assert_eq!(input1, input2, "Public input {} mismatch after roundtrip", i);
+            assert_eq!(
+                input1, input2,
+                "Public input {} mismatch after roundtrip",
+                i
+            );
         }
     }
 }
