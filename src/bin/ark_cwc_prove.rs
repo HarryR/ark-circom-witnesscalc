@@ -3,7 +3,7 @@ use std::fs::{OpenOptions, read, read_to_string, write};
 
 use anyhow::Result;
 use ark_serialize::CanonicalSerialize;
-use ark_circom_witnesscalc::{proof_oneshot, proof_to_json};
+use ark_circom_witnesscalc::{proof_oneshot, jsonstructs::proof_to_json};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -30,9 +30,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pkey_data = read(path_input_pkey)
         .expect("Failed to read graph file");
 
-    let (proof,public_inputs) = proof_oneshot(&inputs_data, &pkey_data, &graph_data, &r1cs_data);
+    let (proof,public_inputs) = proof_oneshot(&inputs_data, &pkey_data, &graph_data, &r1cs_data);    
 
     let proof_json = proof_to_json(&proof, &public_inputs)?;
+
     write(path_out_proof_json, proof_json)?;
 
     let binproof_out_file = OpenOptions::new()

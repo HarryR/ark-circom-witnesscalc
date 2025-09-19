@@ -11,7 +11,7 @@ use ark_ff::PrimeField;
 
 use super::r1cs_reader::R1CS;
 
-use color_eyre::Result;
+use anyhow::Result;
 
 #[derive(Clone, Debug)]
 pub struct CircomCircuit<F: PrimeField> {
@@ -86,31 +86,3 @@ impl<F: PrimeField> ConstraintSynthesizer<F> for CircomCircuit<F> {
         Ok(())
     }
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{CircomBuilder, CircomConfig};
-    use ark_bn254::Fr;
-    use ark_relations::r1cs::ConstraintSystem;
-
-    #[tokio::test]
-    async fn satisfied() {
-        let cfg = CircomConfig::<Fr>::new(
-            "./test-vectors/mycircuit_js/mycircuit.wasm",
-            "./test-vectors/mycircuit.r1cs",
-        )
-        .unwrap();
-        let mut builder = CircomBuilder::new(cfg);
-        builder.push_input("a", 3);
-        builder.push_input("b", 11);
-
-        let circom = builder.build().unwrap();
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        circom.generate_constraints(cs.clone()).unwrap();
-        assert!(cs.is_satisfied().unwrap());
-    }
-}
-
- */

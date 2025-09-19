@@ -29,6 +29,13 @@ It outputs
  * `proof.json` - easy JSON format
  * `proof.bin` - Arkworks binary proof struct
 
+### `ark_cwc_verify_json`
+
+Takes as inputs:
+
+ * `proof.json` - Output from `ark_cwc_prove`
+ * `vk.json` - Output from `ark_cwc_setup`
+
 ## Usage from Rust
 
 There are two main functions:

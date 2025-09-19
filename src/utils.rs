@@ -4,9 +4,13 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use anyhow::anyhow;
+use ark_groth16::prepare_verifying_key;
+use ark_groth16::VerifyingKey;
 
 use crate::circuit::CircomCircuit;
+use crate::proof_from_json;
 use crate::r1cs_reader::R1CSFile;
+use crate::verifying_key_from_json;
 
 use circom_witnesscalc::{
     field::{Field, FieldOperations, FieldOps, U254},
@@ -197,33 +201,34 @@ pub fn proof_oneshot(inputs_data: &str, pkey_data:&[u8], graph_data:&[u8], r1cs_
     
     let proof = Groth16::<Bn254,LibsnarkReduction>::prove(&pkey, circom, &mut rng).unwrap();
 
-    /*
-    let mut result = String::new();
-    result.extend([
-        format!("{{\n"),
-        format!("\t\"protocol\":\"groth16\",\n"),
-        format!("\t\"type\":\"proof\",\n"),
-        format!("\t\"curve\":\"bn128\",\n"),
-        format!("\t\"a\": [\"{}\", \"{}\", \"1\"],\n", proof.a.x, proof.a.y),
-        format!("\t\"b\": [[\"{}\", \"{}\"], [\"{}\", \"{}\"], [\"1\",\"0\"]],",
-        proof.b.x.c0, proof.b.x.c1,
-        proof.b.y.c0, proof.b.y.c1),
-        format!("\t\"c\": [\"{}\", \"{}\", \"1\"],\n", proof.c.x, proof.c.y),
-        format!("\t\"inputs\": [")
-    ]);
-
-    for (i, value) in public_inputs.iter().enumerate() {
-        if i != 0 {
-            result.extend([',','\n']);
-        }
-        result.extend([
-            format!("\t\t\"{}\"", value.to_string())
-        ]);
-    }
-    result.extend(["\n\t]\n}}\n"]);
-
-    result
-     */
+    // Verify the proof can be rverified!
+    let pvk = prepare_verifying_key(&pkey.vk);
+    let result = Groth16::<Bn254,LibsnarkReduction>::verify_proof(&pvk, &proof, &public_inputs).unwrap();
+    assert!(result);
 
     (proof, public_inputs)
+}
+
+pub fn verify_proof(vkey_data:&[u8], proof_data: &[u8], public_inputs: &[Bn254Fr]) -> Result<bool>
+{
+    let vkey_reader = Cursor::new(vkey_data);
+    let vkey = VerifyingKey::<Bn254>::deserialize_uncompressed_unchecked(vkey_reader).unwrap();
+
+    let proof_reader = Cursor::new(proof_data);
+    let proof = Proof::<Bn254>::deserialize_uncompressed_unchecked(proof_reader).unwrap();
+
+    let pvk = prepare_verifying_key(&vkey);
+    let result = Groth16::<Bn254,LibsnarkReduction>::verify_proof(&pvk, &proof, public_inputs)?;
+    Ok(result)
+}
+
+pub fn verify_proof_json(vkey_json:&str, proof_json: &str) -> Result<bool>
+{
+    let (proof, public_inputs) = proof_from_json(&proof_json)?;
+    let vkey = verifying_key_from_json(vkey_json)?;
+
+    let pvk = prepare_verifying_key(&vkey);
+    let result = Groth16::<Bn254,LibsnarkReduction>::verify_proof(&pvk, &proof, &public_inputs)?;
+
+    Ok(result)
 }
