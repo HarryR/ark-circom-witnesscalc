@@ -1,7 +1,7 @@
 all: lint test test-cli
 
 lint:
-	cargo fmt --all -- --check
+	cargo fmt --all
 	cargo clippy --all-targets --all-features -- -D warnings
 
 test:

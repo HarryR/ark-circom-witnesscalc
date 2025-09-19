@@ -172,23 +172,42 @@ And we can provide the proof inputs as JSON to the form field, for example:
 
 # Solidity Compatibility
 
-Remember, the G2 coefficients in arkworks-rs are `[c0,c1]`, wheras the EVM `ECPAIRING` opcode expects them to be `[c1,c0]`. The following code can help you convert between formats when using TypeScript:
+The G2 coefficients in arkworks-rs are `[c0,c1]`, wheras the EVM `ECPAIRING` opcode expects them to be `[c1,c0]`, furthermore snarkjs sometimes expects them to be `[c0,c1]. I use snarkjs to generate the verifying contract via hardhat.
 
 ```typescript
-type ARK_CWC_G1 = [string,string,string];
-type ARK_CWC_G2 = [[string,string],[string,string],[string,string]];
+import { task } from 'hardhat/config';
+import { readFile } from 'fs/promises';
+import { dirname, join } from 'path';
+import { render } from 'ejs';
+import { BigNumberish } from 'ethers';
 
-interface ARK_CWC_VerifyingKey {
-    protocol: string,
-    curve: string,
-    nPublic: number,
-    vk_alpha_1: ARK_CWC_G1,
-    vk_beta_2: ARK_CWC_G2,
-    vk_gamma_2: ARK_CWC_G2,
-    vk_delta_2: ARK_CWC_G2,
-    IC: ARK_CWC_G1[],
+type Coeffs = [BigNumberish,BigNumberish];
+function fix_g2_coeffs(x:[Coeffs,Coeffs]) {
+    return x.map((x) => [x[1],x[0]]);
 }
 
+task<{
+    vk: string;
+}>('gen-verifier', 'Generate Solidity Verifier')
+.addPositionalParam('vk', 'Path to the verification key JSON file')
+.setAction(async (args) => {
+    const snarkjsPath = dirname(require.resolve('snarkjs'));
+    const tplPath = join(snarkjsPath, '../', 'templates', 'verifier_groth16.sol.ejs');
+    const tpl = await readFile(tplPath, 'utf8');
+    const vk = JSON.parse(await readFile(args.vk, 'utf8'));
+    vk.vk_beta_2 = fix_g2_coeffs(vk.vk_beta_2);
+    vk.vk_gamma_2 = fix_g2_coeffs(vk.vk_gamma_2);
+    vk.vk_delta_2 = fix_g2_coeffs(vk.vk_delta_2);
+    console.log(render(tpl, vk));
+});
+```
+
+You can then pass the proof json directly to the generated contract, for example:
+
+```typescript
+import { readFile } from 'node:fs/promises';
+type ARK_CWC_G1 = [string,string];
+type ARK_CWC_G2 = [[string,string],[string,string]];
 interface ARK_CWC_Proof {
     protocol: string,
     curve: string,
@@ -198,28 +217,6 @@ interface ARK_CWC_Proof {
     c: ARK_CWC_G1,
     inputs: string[]
 }
-
-function swap_c0_c1(f:[string,string]): [string,string] {
-    return [f[1], f[0]];
-}
-
-function ark_g1_to_sol(p:ARK_CWC_G1) {
-    return {'X': p[0], 'Y': p[1]};
-}
-
-function ark_g2_to_sol(p:ARK_CWC_G2) {
-    return {'X': swap_c0_c1(p[0]), 'Y': swap_c0_c1(p[1])};
-}
-```
-
-For example:
-
-```typescript
-import { readFile } from 'node:fs/promises';
 const proof: ARK_CWC_Proof = JSON.parse((await readFile('proof.json')).toString());
-await contract.verify(proof.inputs, {
-    'A': awk_g1_to_sol(proof.a),
-    'B': awk_g2_to_sol(proof.b),
-    'C': awk_g1_to_sol(proof.c),
-});
+const result = await contract.verifyProof(proof.a, proof.b, proof.c, proof.inputs as any);
 ```
