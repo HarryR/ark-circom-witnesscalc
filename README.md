@@ -169,3 +169,57 @@ And we can provide the proof inputs as JSON to the form field, for example:
 ```json
 {"a": "11", "b": "10"}
 ```
+
+# Solidity Compatibility
+
+Remember, the G2 coefficients in arkworks-rs are `[c0,c1]`, wheras the EVM `ECPAIRING` opcode expects them to be `[c1,c0]`. The following code can help you convert between formats when using TypeScript:
+
+```typescript
+type ARK_CWC_G1 = [string,string,string];
+type ARK_CWC_G2 = [[string,string],[string,string],[string,string]];
+
+interface ARK_CWC_VerifyingKey {
+    protocol: string,
+    curve: string,
+    nPublic: number,
+    vk_alpha_1: ARK_CWC_G1,
+    vk_beta_2: ARK_CWC_G2,
+    vk_gamma_2: ARK_CWC_G2,
+    vk_delta_2: ARK_CWC_G2,
+    IC: ARK_CWC_G1[],
+}
+
+interface ARK_CWC_Proof {
+    protocol: string,
+    curve: string,
+    type: string,
+    a: ARK_CWC_G1,
+    b: ARK_CWC_G2,
+    c: ARK_CWC_G1,
+    inputs: string[]
+}
+
+function swap_c0_c1(f:[string,string]): [string,string] {
+    return [f[1], f[0]];
+}
+
+function ark_g1_to_sol(p:ARK_CWC_G1) {
+    return {'X': p[0], 'Y': p[1]};
+}
+
+function ark_g2_to_sol(p:ARK_CWC_G2) {
+    return {'X': swap_c0_c1(p[0]), 'Y': swap_c0_c1(p[1])};
+}
+```
+
+For example:
+
+```typescript
+import { readFile } from 'node:fs/promises';
+const proof: ARK_CWC_Proof = JSON.parse((await readFile('proof.json')).toString());
+await contract.verify(proof.inputs, {
+    'A': awk_g1_to_sol(proof.a),
+    'B': awk_g2_to_sol(proof.b),
+    'C': awk_g1_to_sol(proof.c),
+});
+```
